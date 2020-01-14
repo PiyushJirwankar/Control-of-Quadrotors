@@ -7,7 +7,7 @@ test = 1
 g = 9.81
 m = 2.0
 
-T = 25	 #simulation time
+T = 10	 #simulation time
 N_pos = 100 * T    #number of sample points for outer loop
 N_att = 10*N_pos   #number of sample points for inner loop
 # print(N_att)
@@ -16,11 +16,11 @@ time_pos = np.linspace(0, T, N_pos, endpoint = False)
 
 ##### omega #############
 omega = np.zeros((3, N_att+1))
-omega[:, 0] = np.array([1.0, 1.0, 1.0])
+omega[:, 0] = np.array([0.0, 0.0, 0.0])
 
 ##### euler angles ########
 euler_angle = np.zeros((3, N_att))
-euler_angle[:, 0] = (1/180.0)*(np.pi)*np.array([5, 6, 7])
+euler_angle[:, 0] = (1/180.0)*(np.pi)*np.array([0, 0, 0])
 
 psi_T = np.pi/(180.0)*60 
 # print(psi_T) 
@@ -30,9 +30,9 @@ psi_T_arr = np.linspace(euler_angle[0, 2], psi_T, N_att)
 
 
 ###### Moment of inertia #######
-I = np.array([[1.0, 0.0, 0.0],
-			  [0.0, 1.0, 0.0],
-			  [0.0, 0.0, 2.0]])
+I = np.array([[0.01, 0.0, 0.0],
+			  [0.0, 0.02, 0.0],
+			  [0.0, 0.0, 0.03]])
 
 Ixx = I[0,0]
 Iyy = I[1,1]
@@ -44,7 +44,7 @@ for i in range(N_pos):
 	r_T[2] = 1
 
 r = np.zeros((3, N_pos+1))
-r[:, 0] = np.array([0.0, 0.0, 0.0])
+r[:, 0] = np.array([1.0, 0.0, 0.0])
 
 r_dot = np.zeros((3, N_pos+1))
 r_dot[:, 0] = np.array([0.0, 0.0, 0.0])
@@ -61,21 +61,19 @@ des_euler = np.zeros((3, N_att))  # [phi, theta, psi]
 des_omega = np.zeros((3, N_att))  # [p_des, q_des, r_des]
 
 kp_pos = 10*np.array([1.0, 1.0, 1.0])
-kd_pos = 1*np.array([1.0, 1.0, 10.0])
-ki_pos = 1*np.array([1.0, 1.0, 1.0])
+kd_pos = 10*np.array([1.0, 1.0, 1.0])
+ki_pos = 10*np.array([1.0, 1.0, 1.0])
 
-kp_ang = np.array([1.0, 1.0, 1.0])  # [kp_phi, kp_theta, kp_psi]
-kd_ang = np.array([1.0, 1.0, 2.0])  # [kd_phi, kd_theta, kd_psi]
+kp_ang = np.array([0.5, 0.4, 0.5])  # [kp_phi, kp_theta, kp_psi]
+kd_ang = np.array([0.5, 0.5, 0.5])  # [kd_phi, kd_theta, kd_psi]
 
 ei = np.zeros(3)
-ei_ang = np.zeros(3)
 
-# print(psi_T_arr)
 for i in range(N_pos):
-	print(i)
+	# print(i)
 	ei = ei + (r_T[:, i] - r[:, i])*0.01#*(1/(1.0*N_pos*T))
-	r_des_ddot[:] = -kd_pos*(r_dot[:, i]) + kp_pos*(r_T[:, i]-r[:, i]) + ki_pos*ei 
-	print(r_dot[:,i])#r_des_ddot[:])
+	print(r_des_ddot)
+	r_des_ddot[:] =  ki_pos*ei + kd_pos*(0-r_dot[:, i]) + kp_pos*(r_T[:, i]-r[:, i])
 
 	for j in range(10):
 		# print("j = ", j)
@@ -84,37 +82,40 @@ for i in range(N_pos):
 			break
 		else:
 			# print(control_inputs[1:, 10*i+j])
+			# des_euler[0, 10*i+j] = (1/g)*(r_des_ddot[0]*np.sin(psi_T) - r_des_ddot[1]*np.cos(psi_T))
+			# des_euler[1, 10*i+j] = (1/g)*(r_des_ddot[0]*np.cos(psi_T) + r_des_ddot[1]*np.sin(psi_T))
 			des_euler[2, 10*i+j] = psi_T
 			control_inputs[1:, 10*i+j] = kp_ang*(des_euler[:, 10*i+j] - euler_angle[:, 10*i+j]) + kd_ang*(des_omega[:, 10*i+j] - omega[:, 10*i+j])
+			# print(control_inputs[:, 10*i+j])
 			control_inputs[0, 10*i+j] = m*r_des_ddot[2]
 
 			def rigid_body_dyn(t, w):  #returns w_dot	
-				# w_dot = np.linalg.inv(I).dot(control_inputs[1:, 10*i+j] - np.cross(w, I.dot(w)))
+				# w_d	ot = np.linalg.inv(I).dot(control_inputs[1:, 10*i+j] - np.cross(w, I.dot(w)))
 				w_dot = np.zeros(3)
 				w_dot[0] = control_inputs[1,10*i+j]/Ixx - w[1]*w[2]*(Izz-Iyy)/Ixx
 				w_dot[1] = control_inputs[2,10*i+j]/Iyy - w[0]*w[2]*(Ixx-Izz)/Iyy
 				w_dot[2] = control_inputs[3,10*i+j]/Izz
-				return w_dot
+				return w_dot	
 
 			des_euler[0, 10*i+j] = (1/g)*(r_des_ddot[0]*np.sin(psi_T) - r_des_ddot[1]*np.cos(psi_T))
 			des_euler[1, 10*i+j] = (1/g)*(r_des_ddot[0]*np.cos(psi_T) + r_des_ddot[1]*np.sin(psi_T))
-			#(psi_T_arr[10*i+j] - euler_angle[2, 10*i+j]) #des_euler[2, 10*i+j-1] + omega[2, 10*i+j]*0.001
-			# print(des_omega[2, 10*i+j])
+			# print(r_des_ddot)
 
 			if not(i ==0 and j==0):
-				des_omega[:, 10*i+j+1] = (des_euler[:, 10*i+j]-des_euler[:, 10*i+j-1])*0.001#/(1.0*N_att*T)
-				# des_omega[2, 10*i+j+1]  = (psi_T_arr[10*i+j] - psi_T_arr[10*i+j-1])/0.001#des_euler[2, 10*i+j] + (omega[2, 10*i+j])*0.001   #calculating phi_dot_des
+				des_omega[:, 10*i+j+1] = (des_euler[:, 10*i+j]-des_euler[:, 10*i+j-1])/0.001#
 
 			omega[:, 10*i+j+1] = RK4(rigid_body_dyn, omega[:, 10*i+j], time_att[10*i+j], time_att[10*i+j+1] , 0.001/10, 3)[0]
 			euler_angle[:, 10*i+j+1] = euler_angle[:, 10*i+j] + 0.001*omega[:, 10*i+j]
 
+	# R = Rot.from_euler('zxy', [[],[],[]], degrees=True)
+			
 	R = functions.euler_to_rotm(euler_angle[0, 10*i], euler_angle[1, 10*i], euler_angle[2, 10*i])
 	thrust = np.array([0.0, 0.0, control_inputs[0, 10*i]])
+	# print(r_dot[:, i])
 	r_ddot[:, i+1] = (1/m)*(np.dot(R, thrust)) - np.array([0.0, 0.0, g])
 	r_dot [:, i+1] = r_dot[:, i] + r_ddot[:, i+1]*0.01
 	r     [:, i+1] = r[:, i] + r_dot[:, i+1]*0.01
-	# print(np.dot(R, thrust))
-	# print(r[:, i])
+	# print(r_des_ddot)
 
 omega 	= omega[:, :-1]
 r 		= r[:, :-1]
